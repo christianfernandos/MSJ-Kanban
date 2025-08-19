@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Prophecy\Call\Call;
 
 class DatabaseSeeder extends Seeder
 {
@@ -557,6 +556,9 @@ class DatabaseSeeder extends Seeder
             menu_rpt_seeder::class,
             tabel_rpt_seeder::class,
             example_call_seed::class,
+            KanbanSampleDataSeeder::class,
+            kanban_menu_seeder::class,
+            kanban_systable_seeder::class
         ]);
     }
 }
