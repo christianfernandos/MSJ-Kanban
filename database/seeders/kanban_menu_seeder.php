@@ -48,11 +48,11 @@ class kanban_menu_seeder extends Seeder
             'gmenu' => 'kanban',
             'dmenu' => 'msbrd',
             'urut' => 2,
-            'name' => 'Project Management',
+            'name' => 'Kanban Board',
             'url' => 'msbrd',
             'icon' => 'ni-collection',
             'tabel' => 'projects',
-            'layout' => 'master',
+            'layout' => 'manual',
             'isactive' => '1'
         ]);
 

@@ -24,6 +24,9 @@ return new class extends Migration
             $table->decimal('budget', 15, 2)->nullable();
             $table->string('color', 7)->default('#007bff'); // Hex color code
             $table->unsignedBigInteger('owner_id');
+            $table->unsignedBigInteger('created_by')->nullable(); // Add created_by column as nullable
+            $table->string('year', 4)->default(date('Y')); // Add year column
+            $table->string('department')->nullable(); // Add department column
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();
             $table->string('user_create')->nullable();
@@ -31,12 +34,15 @@ return new class extends Migration
 
             // Foreign key constraints
             $table->foreign('owner_id')->references('id')->on('users')->onDelete('cascade');
+            $table->foreign('created_by')->references('id')->on('users')->onDelete('set null');
 
             // Indexes
             $table->index('status');
             $table->index('priority');
             $table->index('owner_id');
+            $table->index('created_by');
             $table->index(['status', 'priority']);
+            $table->index(['created_by', 'status']);
         });
     }
 
