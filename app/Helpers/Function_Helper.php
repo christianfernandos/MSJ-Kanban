@@ -11,6 +11,12 @@ class Function_Helper
     {
         //check session
         (Session::has('username')) ? $username = session('username') : ((request()->username) ? $username = request()->username : $username = '-');
+        
+        // Truncate description if it's too long to prevent SQL errors
+        if (strlen($desc) > 200) {
+            $desc = substr($desc, 0, 197) . '...';
+        }
+        
         $data_log = [
             'DATE' => now(),
             'USERNAME' => $username,

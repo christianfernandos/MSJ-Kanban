@@ -220,12 +220,6 @@ class MsbrdController extends Controller
                 return response()->json(['success' => false, 'message' => 'Board name is required'], 400);
             }
 
-            // Validate and trim description to prevent overflow
-            $description = request()->description ?? '';
-            if (strlen($description) > 255) {
-                $description = substr($description, 0, 252) . '...';
-            }
-
             // Map background color to status for compatibility
             $backgroundColorToStatus = [
                 'emerald' => 'active',
@@ -245,7 +239,6 @@ class MsbrdController extends Controller
 
             $projectData = [
                 'name' => trim($name),
-                'description' => $description,
                 'status' => $status,
                 'priority' => 'medium',
                 'color' => $backgroundColor,
@@ -265,8 +258,9 @@ class MsbrdController extends Controller
                 'user_id' => $currentUser->id,
                 'action' => 'create_project',
                 'description' => 'Created new project: ' . $project->name,
-                'model_type' => Project::class,
-                'model_id' => $project->id
+                'subject_type' => Project::class,
+                'subject_id' => $project->id,
+                'created_at' => now()
             ]);
 
             DB::commit();
@@ -280,7 +274,6 @@ class MsbrdController extends Controller
                     'board' => [
                         'id' => $project->id,
                         'name' => $project->name,
-                        'description' => $project->description,
                         'status' => $project->status,
                         'color' => $project->color,
                         'background_color' => $backgroundColor,
@@ -302,7 +295,7 @@ class MsbrdController extends Controller
                 'request_data' => request()->all()
             ]);
             
-            $syslog->log_insert('E', $data['dmenu'] ?? 'msbrd', 'Create Board Error: ' . $e->getMessage(), '0');
+            $syslog->log_insert('E', $data['dmenu'] ?? 'msbrd', 'Create Board Error', '0');
             
             if (request()->expectsJson() || request()->wantsJson()) {
                 return response()->json([
@@ -456,8 +449,9 @@ class MsbrdController extends Controller
                 'user_id' => $currentUser->id,
                 'action' => 'create_task',
                 'description' => 'Created new task: ' . $task->title,
-                'model_type' => Task::class,
-                'model_id' => $task->id
+                'subject_type' => Task::class,
+                'subject_id' => $task->id,
+                'created_at' => now()
             ]);
 
             DB::commit();
@@ -507,8 +501,9 @@ class MsbrdController extends Controller
                 'user_id' => $currentUser->id,
                 'action' => 'update_task',
                 'description' => 'Updated task: ' . $task->title,
-                'model_type' => Task::class,
-                'model_id' => $task->id
+                'subject_type' => Task::class,
+                'subject_id' => $task->id,
+                'created_at' => now()
             ]);
 
             DB::commit();
@@ -563,8 +558,9 @@ class MsbrdController extends Controller
                 'user_id' => $currentUser->id,
                 'action' => 'move_task',
                 'description' => "Moved task '{$task->title}' from {$oldColumn} to {$newColumn}",
-                'model_type' => Task::class,
-                'model_id' => $task->id
+                'subject_type' => Task::class,
+                'subject_id' => $task->id,
+                'created_at' => now()
             ]);
 
             DB::commit();
@@ -708,8 +704,9 @@ class MsbrdController extends Controller
                 'user_id' => $currentUser->id,
                 'action' => 'delete_task',
                 'description' => 'Deleted task: ' . $taskTitle,
-                'model_type' => Task::class,
-                'model_id' => $task->id
+                'subject_type' => Task::class,
+                'subject_id' => $task->id,
+                'created_at' => now()
             ]);
 
             // Update positions in column

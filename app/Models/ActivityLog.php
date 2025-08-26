@@ -12,6 +12,9 @@ class ActivityLog extends Model
     use HasFactory;
 
     protected $table = 'activity_logs';
+    
+    // Disable automatic timestamps since the table may not have updated_at
+    public $timestamps = false;
 
     protected $fillable = [
         'action',
@@ -23,7 +26,8 @@ class ActivityLog extends Model
         'subject_id',
         'subject_type',
         'user_id',
-        'user_create'
+        'user_create',
+        'created_at'
     ];
 
     protected $casts = [
