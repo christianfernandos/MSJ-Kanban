@@ -15,7 +15,7 @@ function initializeKanbanBoard() {
 // Initialize drag and drop functionality
 function initializeDragAndDrop() {
     // Add event listeners to all task cards
-    document.querySelectorAll('.task-card').forEach(card => {
+    document.querySelectorAll('.card[data-task-id]').forEach(card => {
         addTaskCardListeners(card);
     });
 
@@ -29,6 +29,7 @@ function initializeDragAndDrop() {
 function addTaskCardListeners(card) {
     card.addEventListener('dragstart', handleDragStart);
     card.addEventListener('dragend', handleDragEnd);
+    card.addEventListener('click', handleCardClick);
 }
 
 // Add event listeners to a column
@@ -219,8 +220,29 @@ function applyFilters() {
 
 // Open task details (placeholder)
 function openTaskDetails(taskId) {
-    // For now, just open edit modal
-    editTask(taskId);
+    // Open task detail modal
+    if (typeof openTaskDetailModal === 'function') {
+        openTaskDetailModal(taskId);
+    } else {
+        console.error('openTaskDetailModal function not found');
+        showToast('error', 'Task detail modal not available');
+    }
+}
+
+// Handle card click to open task details
+function handleCardClick(e) {
+    // Don't open modal if dragging
+    if (this.classList.contains('dragging')) {
+        return;
+    }
+    
+    const taskId = this.dataset.taskId;
+    if (taskId) {
+        openTaskDetails(taskId);
+    } else {
+        console.error('Task ID not found on card');
+        showToast('error', 'Task ID not found');
+    }
 }
 
 // Utility function to show toast notifications

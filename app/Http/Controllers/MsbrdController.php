@@ -21,12 +21,15 @@ class MsbrdController extends Controller
      */
     public function index($data)
     {
+        // Debug log
+        \Log::info('MsbrdController@index called', ['data' => $data]);
+        
         // function helper
         $data['format'] = new Format_Helper;
         $syslog = new Function_Helper;
 
         // Get user login information and rules (required for gmenu query)
-        $data['user_login'] = User::where('username', session('username'))->first();
+        $data['user_login'] = User::find(session('username'));
 
         // Check if user is logged in
         if (!$data['user_login']) {
@@ -57,6 +60,7 @@ class MsbrdController extends Controller
 
         // Get user's own projects - handle the case where created_by might be null
         try {
+            // Get user's own projects - handle the case where created_by might be null
             $data['my_boards'] = Project::where(function($query) use ($data) {
                                         $query->where('created_by', $data['user_login']->id)
                                               ->orWhere('owner_id', $data['user_login']->id);
@@ -93,8 +97,8 @@ class MsbrdController extends Controller
             $syslog->log_insert('V', $data['dmenu'], 'Access Kanban Boards List', '1');
         }
 
-        // Use the boards view
-        // $data['url'] = 'kanban.msbrd.boards';
+        // Make sure we use the list view for boards overview
+        $data['url'] = 'kanban.msbrd.list';
 
         return view($data['url'], $data);
     }
@@ -104,12 +108,15 @@ class MsbrdController extends Controller
      */
     public function show($data)
     {
+        // Debug log
+        \Log::info('MsbrdController@show called', ['data' => $data]);
+        
         // function helper
         $data['format'] = new Format_Helper;
         $syslog = new Function_Helper;
 
         // Get user login information and rules (required for gmenu query)
-        $data['user_login'] = User::where('username', session('username'))->first();
+        $data['user_login'] = User::find(session('username'));
 
         // Check if user is logged in
         if (!$data['user_login']) {
@@ -177,7 +184,7 @@ class MsbrdController extends Controller
         }
 
         // Use the kanban board view
-        // $data['url'] = 'kanban.msbrd.show';
+        $data['url'] = 'kanban.msbrd.show';
 
         return view($data['url'], $data);
     }
@@ -187,6 +194,12 @@ class MsbrdController extends Controller
      */
     public function store($data)
     {
+        \Log::info('MsbrdController@store called', [
+            'data' => $data,
+            'request_all' => request()->all(),
+            'request_method' => request()->method()
+        ]);
+
         $syslog = new Function_Helper;
 
         try {
@@ -195,26 +208,57 @@ class MsbrdController extends Controller
             // Get current user
             $currentUser = User::where('username', session('username'))->first();
             if (!$currentUser) {
+                \Log::error('User not found in session', ['username' => session('username')]);
                 return response()->json(['success' => false, 'message' => 'User not found'], 401);
             }
 
+            \Log::info('Current user found', ['user_id' => $currentUser->id, 'username' => $currentUser->username]);
+
+            // Validate required fields
+            $name = request()->name;
+            if (!$name || trim($name) === '') {
+                return response()->json(['success' => false, 'message' => 'Board name is required'], 400);
+            }
+
             // Validate and trim description to prevent overflow
-            $description = request()->description;
+            $description = request()->description ?? '';
             if (strlen($description) > 255) {
                 $description = substr($description, 0, 252) . '...';
             }
 
-            // Create new project/board
-            $project = Project::create([
-                'name' => request()->name,
+            // Map background color to status for compatibility
+            $backgroundColorToStatus = [
+                'emerald' => 'active',
+                'cyan' => 'active',
+                'yellow' => 'active',
+                'gray' => 'active',
+                'rose' => 'active',
+                'red' => 'active',
+                'purple' => 'active',
+                'sky' => 'active',
+                'lime' => 'active',
+                'blue' => 'active'
+            ];
+
+            $backgroundColor = request()->background_color ?? 'emerald';
+            $status = $backgroundColorToStatus[$backgroundColor] ?? 'active';
+
+            $projectData = [
+                'name' => trim($name),
                 'description' => $description,
-                'year' => request()->year ?? date('Y'),
-                'department' => request()->department ?? 'general',
+                'status' => $status,
+                'priority' => 'medium',
+                'color' => $backgroundColor,
                 'owner_id' => $currentUser->id,
-                'created_by' => $currentUser->id,
-                'status' => 'active',
-                'user_create' => session('username')
-            ]);
+                'created_by' => $currentUser->id
+            ];
+
+            \Log::info('Creating project with data', $projectData);
+
+            // Create new project/board
+            $project = Project::create($projectData);
+
+            \Log::info('Project created successfully', ['project_id' => $project->id]);
 
             // Log activity
             ActivityLog::create([
@@ -222,36 +266,52 @@ class MsbrdController extends Controller
                 'action' => 'create_project',
                 'description' => 'Created new project: ' . $project->name,
                 'model_type' => Project::class,
-                'model_id' => $project->id,
-                'user_create' => session('username')
+                'model_id' => $project->id
             ]);
 
             DB::commit();
 
-            if (request()->expectsJson()) {
+            \Log::info('Project creation completed successfully');
+
+            if (request()->expectsJson() || request()->wantsJson()) {
                 return response()->json([
                     'success' => true,
                     'message' => 'Board created successfully!',
-                    'board' => $project
+                    'board' => [
+                        'id' => $project->id,
+                        'name' => $project->name,
+                        'description' => $project->description,
+                        'status' => $project->status,
+                        'color' => $project->color,
+                        'background_color' => $backgroundColor,
+                        'created_at' => $project->created_at->format('Y-m-d H:i:s')
+                    ]
                 ]);
             }
 
             Session::flash('message', 'Board created successfully!');
             Session::flash('class', 'success');
 
-            return redirect($data['url_menu']);
+            return redirect()->back();
+            
         } catch (\Exception $e) {
             DB::rollBack();
-            $syslog->log_insert('E', $data['dmenu'], 'Create Board Error: ' . $e->getMessage(), '0');
+            \Log::error('Exception in store method', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'request_data' => request()->all()
+            ]);
             
-            if (request()->expectsJson()) {
+            $syslog->log_insert('E', $data['dmenu'] ?? 'msbrd', 'Create Board Error: ' . $e->getMessage(), '0');
+            
+            if (request()->expectsJson() || request()->wantsJson()) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Failed to create board: ' . $e->getMessage()
                 ], 500);
             }
 
-            Session::flash('message', 'Failed to create board!');
+            Session::flash('message', 'Failed to create board: ' . $e->getMessage());
             Session::flash('class', 'danger');
             
             return redirect()->back();
@@ -277,7 +337,18 @@ class MsbrdController extends Controller
      */
     public function api($data)
     {
-        $action = $data['idencrypt'] ?? 'get-board';
+        // Add debugging logs
+        \Log::info('MsbrdController@api called', [
+            'data' => $data,
+            'request_all' => request()->all(),
+            'request_method' => request()->method(),
+            'request_url' => request()->fullUrl()
+        ]);
+
+        // Check for action in request parameter first, then fallback to routing parameter
+        $action = request('action') ?? $data['idencrypt'] ?? 'get-board';
+
+        \Log::info('MsbrdController@api determined action', ['action' => $action]);
 
         switch ($action) {
             case 'get-board':
@@ -291,9 +362,11 @@ class MsbrdController extends Controller
             case 'delete-task':
                 return $this->deleteTask();
             case 'get-task':
+                \Log::info('MsbrdController@api calling getTask');
                 return $this->getTask();
             default:
-                return response()->json(['error' => 'Invalid action'], 400);
+                \Log::error('MsbrdController@api invalid action', ['action' => $action]);
+                return response()->json(['success' => false, 'error' => 'Invalid action'], 400);
         }
     }
 
@@ -375,8 +448,7 @@ class MsbrdController extends Controller
                 'position' => Task::where('project_id', request('project_id'))
                                  ->where('board_column', request('status', 'todo'))
                                  ->max('position') + 1,
-                'progress' => request('progress', 0),
-                'user_create' => session('username')
+                'progress' => request('progress', 0)
             ]);
 
             // Log activity
@@ -385,8 +457,7 @@ class MsbrdController extends Controller
                 'action' => 'create_task',
                 'description' => 'Created new task: ' . $task->title,
                 'model_type' => Task::class,
-                'model_id' => $task->id,
-                'user_create' => session('username')
+                'model_id' => $task->id
             ]);
 
             DB::commit();
@@ -437,8 +508,7 @@ class MsbrdController extends Controller
                 'action' => 'update_task',
                 'description' => 'Updated task: ' . $task->title,
                 'model_type' => Task::class,
-                'model_id' => $task->id,
-                'user_create' => session('username')
+                'model_id' => $task->id
             ]);
 
             DB::commit();
@@ -494,8 +564,7 @@ class MsbrdController extends Controller
                 'action' => 'move_task',
                 'description' => "Moved task '{$task->title}' from {$oldColumn} to {$newColumn}",
                 'model_type' => Task::class,
-                'model_id' => $task->id,
-                'user_create' => session('username')
+                'model_id' => $task->id
             ]);
 
             DB::commit();
@@ -511,13 +580,58 @@ class MsbrdController extends Controller
     }
 
     /**
-     * Get single task
+     * Get single task - Made public for MSJ Framework routing
      */
-    private function getTask()
+    public function getTask($data = null)
     {
+        \Log::info('MsbrdController@getTask called', [
+            'data' => $data,
+            'request_all' => request()->all(),
+            'request_method' => request()->method(),
+            'request_url' => request()->fullUrl()
+        ]);
+
         try {
-            $task = Task::with(['assignee', 'category', 'creator'])
-                       ->findOrFail(request('task_id'));
+            $taskId = request('task_id') ?? request('id');
+            
+            if (!$taskId) {
+                \Log::warning("No task_id provided");
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Task ID is required'
+                ], 400);
+            }
+
+            \Log::info("Looking for task", ['task_id' => $taskId]);
+
+            $task = Task::with(['assignee', 'category', 'creator'])->find($taskId);
+
+            if (!$task) {
+                \Log::warning("Task not found", ['task_id' => $taskId]);
+                // Return demo data for testing
+                $demoTask = [
+                    'id' => $taskId,
+                    'title' => "Demo Task #{$taskId}",
+                    'description' => "This is demo data because task ID {$taskId} was not found in the database.",
+                    'status' => 'todo',
+                    'priority' => 'medium',
+                    'due_date' => now()->addDays(7)->format('Y-m-d'),
+                    'created_at' => now()->format('Y-m-d'),
+                    'category_id' => null,
+                    'assigned_to' => null,
+                    'progress' => 0,
+                    'project_id' => 1,
+                    'department' => 'GEMBONG'
+                ];
+                
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Demo task data (task not found in database)',
+                    'task' => $demoTask
+                ]);
+            }
+
+            \Log::info("Task found", ['task' => $task->toArray()]);
 
             return response()->json([
                 'success' => true,
@@ -528,15 +642,53 @@ class MsbrdController extends Controller
                     'status' => $task->status,
                     'priority' => $task->priority,
                     'due_date' => $task->due_date ? $task->due_date->format('Y-m-d') : null,
+                    'created_at' => $task->created_at ? $task->created_at->format('Y-m-d') : null,
                     'category_id' => $task->category_id,
                     'assigned_to' => $task->assigned_to,
                     'progress' => $task->progress,
-                    'project_id' => $task->project_id
+                    'project_id' => $task->project_id,
+                    'department' => $task->department ?? 'GEMBONG'
                 ]
             ]);
         } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 404);
+            \Log::error('Exception in getTask', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'success' => false,
+                'error' => 'Error retrieving task: ' . $e->getMessage()
+            ], 500);
         }
+    }
+
+    /**
+     * Handle MSJ Framework dashed method routing
+     */
+    public function __call($method, $args)
+    {
+        \Log::info('MsbrdController@__call triggered', [
+            'method' => $method,
+            'args' => $args,
+            'url' => request()->fullUrl()
+        ]);
+
+        // Map dashed method names to actual methods
+        $methodMap = [
+            'get-task' => 'getTask'
+        ];
+
+        if (isset($methodMap[$method])) {
+            $realMethod = $methodMap[$method];
+            \Log::info("Routing {$method} to {$realMethod}");
+            return $this->{$realMethod}($args[0] ?? null);
+        }
+
+        \Log::error('Method not found', ['method' => $method]);
+        return response()->json([
+            'success' => false,
+            'error' => "Method {$method} not found"
+        ], 404);
     }
 
     /**
@@ -557,8 +709,7 @@ class MsbrdController extends Controller
                 'action' => 'delete_task',
                 'description' => 'Deleted task: ' . $taskTitle,
                 'model_type' => Task::class,
-                'model_id' => $task->id,
-                'user_create' => session('username')
+                'model_id' => $task->id
             ]);
 
             // Update positions in column

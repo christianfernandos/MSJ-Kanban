@@ -1,3 +1,4 @@
+
 @extends('layouts.app', ['class' => 'g-sidenav-show bg-gray-100'])
 
 @section('content')
@@ -16,7 +17,7 @@
         /* Page Navigation Container - separated and positioned higher */
         .page-nav-container {
             position: relative;
-            z-index: 1050;
+            z-index: 100; /* Lowered z-index to avoid conflicts with modal */
             margin-top: -60px;
             margin-bottom: 20px;
         }
@@ -41,7 +42,7 @@
         /* Back Button Container - separated from search */
         .back-btn-container {
             position: relative;
-            z-index: 1050;
+            z-index: 100; /* Lowered z-index to avoid conflicts with modal */
             margin: 0 20px 25px 20px;
         }
 
@@ -65,7 +66,7 @@
         .search-section {
             margin: 0 20px 20px 20px;
             position: relative;
-            z-index: 1050;
+            z-index: 100; /* Lowered z-index to avoid conflicts with modal */
         }
 
         .search-container {
@@ -1025,9 +1026,13 @@ document.addEventListener('click', function(e) {
     if (taskCard && !e.target.closest('.add-card')) {
         const taskId = taskCard.dataset.taskId;
         if (taskId) {
-            openTaskModal(null, taskId);
+            console.log('Task card clicked, opening detail modal for task ID:', taskId);
+            openTaskDetailModal(taskId);
         }
     }
 });
 </script>
 @endpush
+
+{{-- Include Task Detail Modal --}}
+@include('kanban.msbrd.modals.task-detail-modal')

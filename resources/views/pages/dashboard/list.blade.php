@@ -8,7 +8,7 @@
                 <div class="card mb-4">
                     <div class="card-header pb-0 p-3">
                         <h6 class="mb-1">Dashboard</h6>
-                        <p class="text-sm">Dashboard MSJframework</p>
+                        <p class="text-sm">Dashboard MSJKanban</p>
                     </div>
                 </div>
             </div>
